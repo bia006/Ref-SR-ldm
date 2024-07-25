@@ -1,0 +1,96 @@
+model:
+  base_learning_rate: 1.0e-06
+  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  params:
+    linear_start: 0.0015
+    linear_end: 0.0155
+    # linear_end: 0.0205
+    log_every_t: 100
+    timesteps: 1000
+    first_stage_key: SR
+    # concat_mode: True
+    cond_stage_trainable: False
+    cond_stage_key: ref
+    conditioning_key: crossattn
+    image_size: 160
+    channels: 3
+    
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      params:
+        use_spatial_transformer: True
+        image_size: 160
+        input_resolution: 160
+        in_channels: 3
+        out_channels: 3
+        model_channels: 384
+        attention_resolutions:
+        - 32
+        - 16
+        - 8
+        num_res_blocks: 2
+        channel_mult:
+        - 1
+        - 1
+        - 1
+        num_heads: 32
+        use_scale_shift_norm: False
+        context_dim: 3840
+        resblock_updown: False
+        legacy: True
+    first_stage_config:
+      target: ldm.models.autoencoder.VQModelInterface
+      # target: ldm.models.autoencoder.AutoencoderKL
+      params:
+        embed_dim: 3
+        n_embed: 8192
+        monitor: val/rec_loss
+        ckpt_path: models/first_stage_models/vq-f4/model.ckpt
+        # ckpt_path: ~
+        ddconfig:
+          double_z: false
+          z_channels: 3
+          resolution: 256
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0
+        lossconfig:
+          target: torch.nn.Identity
+    # cond_stage_config: __is_unconditional__
+    # cond_stage_config:
+    #   target: torch.nn.Identity
+    cond_stage_config:
+      target: ldm.modules.encoders.modules.SpatialRescaler_
+      params:
+        # model: 'ViT-L/14'
+        n_stages: 2
+        in_channels: 3
+        # out_channels: 3
+      #   # n_resblocks: 2
+      #   n_feats: 64
+      #   # scale: 1 
+      #   # rgb_range: 3 
+      #   # n_colors: 3
+      #   # reduction: 16
+      #   # n_resgroups: 2
+# data:
+#   target: main.DataModuleFromConfig
+#   params:
+#     batch_size: 1
+#     num_workers: 12
+#     wrap: false
+#     validation:
+#       target: ldm.data.LRHR_dataset.LSUNChurchesValidation
+#       params:
+#         datatype: "img" 
+#         l_resolution: 128 
+#         r_resolution: 512
+#         flip_p: 0
+

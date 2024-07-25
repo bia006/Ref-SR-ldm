@@ -1,0 +1,140 @@
+model:
+  base_learning_rate: 2.0e-06
+  # base_learning_rate: 1.0e-4
+  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  params:
+    linear_start: 0.0015
+    # linear_end: 0.0155
+    linear_end: 0.0205
+    log_every_t: 100
+    timesteps: 1000
+    first_stage_key: ref
+    # concat_mode: True
+    cond_stage_trainable: False
+    cond_stage_key: image
+    conditioning_key: crossattn
+    image_size: 40
+    channels: 3
+    loss_type: l1
+    monitor: val/loss_simple_ema
+    # ckpt_path: models/first_stage_models/vq-f4/sr_model.ckpt
+    # monitor: val/loss
+    # scheduler_config: # 10000 warmup steps
+    #   target: ldm.lr_scheduler.LambdaLinearScheduler
+    #   params:
+    #     warm_up_steps: [10000]
+    #     cycle_lengths: [10000000000000]
+    #     f_start: [1.e-6]
+    #     f_max: [1.]
+    #     f_min: [ 1.]
+    # scheduler_config:
+    #   target: ldm.lr_scheduler.LambdaWarmUpCosineScheduler
+    #   params:
+    #     verbosity_interval: 0
+    #     warm_up_steps: 1000
+    #     max_decay_steps: 50000
+    #     lr_start: 0.001
+    #     lr_max: 0.1
+    #     lr_min: 0.0001
+
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      params:
+        use_spatial_transformer: True
+        image_size: 40
+        input_resolution: 40
+        in_channels: 3
+        out_channels: 3
+        model_channels: 384
+        attention_resolutions:
+        - 32
+        - 16
+        - 8
+        num_res_blocks: 2
+        channel_mult:
+        - 1
+        - 1
+        - 1
+        num_heads: 32
+        use_scale_shift_norm: False
+        context_dim: 3840
+        resblock_updown: False
+        legacy: True
+    first_stage_config:
+      target: ldm.models.autoencoder.VQModelInterface
+      # target: ldm.models.autoencoder.AutoencoderKL
+      params:
+        embed_dim: 3
+        n_embed: 8192
+        monitor: val/rec_loss
+        ckpt_path: models/first_stage_models/vq-f4/model.ckpt
+        # ckpt_path: ~
+        ddconfig:
+          double_z: false
+          z_channels: 3
+          resolution: 256
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0
+        lossconfig:
+          target: torch.nn.Identity
+    # cond_stage_config: __is_unconditional__
+    # cond_stage_config:
+    #   target: torch.nn.Identity
+    cond_stage_config:
+      target: ldm.modules.encoders.modules.SpatialRescaler_
+      params:
+        # model: 'ViT-L/14'
+        n_stages: 2
+        in_channels: 3
+        # out_channels: 3
+      #   # n_resblocks: 2
+      #   n_feats: 64
+      #   # scale: 1 
+      #   # rgb_range: 3 
+      #   # n_colors: 3
+      #   # reduction: 16
+      #   # n_resgroups: 2
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 64
+    num_workers: 12
+    wrap: false
+    train:
+      target: ldm.data.LRHR_dataset.LSUNChurchesTrain
+      params:
+        datatype: "img" 
+        l_resolution: 40 
+        r_resolution: 160
+        flip_p: 0
+
+    validation:
+      target: ldm.data.LRHR_dataset.LSUNChurchesValidation
+      params:
+        datatype: "img" 
+        l_resolution: 40 
+        r_resolution: 160
+        flip_p: 0
+
+
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        batch_frequency: 1e4
+        max_images: 8
+        increase_log_steps: False
+
+  trainer:
+    benchmark: True
+    # accumulate_grad_batches: 2
+    max_epochs: 4000
